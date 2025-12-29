@@ -107,7 +107,7 @@ def cali_model(qnn: QuantModel,
             _ = qnn(*inputs)
     else:
         wq_dict = dict()
-    ################################ Scale calibration ################################
+        ################################ Scale calibration ################################
         if qnn.use_scale:
             logger.info("Starting scale calibration...")
             
@@ -152,7 +152,7 @@ def cali_model(qnn: QuantModel,
                 qnn.cuda().eval()
                 for name, module in qnn.model.named_modules():
                     if isinstance(module, QuantLayer) and module.gamma is not None:
-                        module_weight = module.weight *module.gamma if module.use_scale else module.weight
+                        module_weight = module.weight * module.gamma if module.use_scale else module.weight
 
                         if module.split == 0:
                             module.wqtizer.delta, module.wqtizer.zero_point = \
@@ -459,11 +459,9 @@ def load_cali_model(qnn: QuantModel,
     for k, v in w_ckpt.items():
         if 'time_embed' in k or 'emb_layers' in k:
             continue
+          
         if k.split('.')[-1] in ['beta', 'gamma']:
-            # if use_aq:
             v = nn.Parameter(v)
-            # else:
-                # continue
         elif k.split('.')[-1] in ['alpha']:
             v = nn.Parameter(v)
         try:
