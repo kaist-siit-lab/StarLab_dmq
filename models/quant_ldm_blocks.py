@@ -367,3 +367,19 @@ class QuantBasicTransformerBlock(BaseQuantBlock):
         x = self.ff(self.norm3(x), t=t, prev_emb_out=prev_emb_out) + x
         return x
     
+class QuantSpatialTransformer(BaseQuantBlock):
+    """
+    Transformer block for image-like data.
+    First, project the input (aka embedding)
+    and reshape to b, t, d.
+    Then apply standard transformer action.
+    Finally, reshape to image
+    """
+    def __init__(self, attn, aq_params, **kwargs):
+        super().__init__(aq_params)
+        self.in_channels = attn.in_channels
+        self.norm = attn.norm
+
+        self.proj_in = attn.proj_in
+        self.transformer_blocks = attn.transformer_blocks
+        self.proj_out = attn.proj_out
