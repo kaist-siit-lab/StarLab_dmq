@@ -111,12 +111,7 @@ def layer_reconstruction(model: QuantModel,
         cur_inputs = [x[idx].to(device=device, non_blocking=True) for x in cached_inputs]
 
         cur_outputs = cached_outputs[idx].to(device=device, non_blocking=True)
-        # if keep_gpu:
-        #     cur_outputs = cached_outputs[idx].to(device=device, non_blocking=True)
-        # else:
-        #     with torch.no_grad() and autocast(enabled=amp_enabled):
-        #         cur_outputs = layer_org(*cur_inputs).detach()
-        
+
         out_quant = layer(*cur_inputs) # ^z
         err = loss_func(out_quant, cur_outputs, cur_inputs[1])
         scaler.scale(err).backward() # (retain_graph=True)
@@ -249,16 +244,7 @@ def block_reconstruction(model: QuantModel,
     for i in range(iters):
         idx = torch.randperm(N)[: batch_size]
         cur_inputs = [x[idx].to(device=device, non_blocking=True) for x in cached_inputs]
-
         cur_outputs = cached_outputs[idx].to(device=device, non_blocking=True)
-        # if keep_gpu:
-        #     cur_outputs = cached_outputs[idx].to(device=device, non_blocking=True)
-        # else:
-        #     with torch.no_grad() and autocast(enabled=amp_enabled):
-        #         cur_outputs = block_org(*cur_inputs)
-        #         if isinstance(cur_outputs, (Tuple, list)):
-        #             cur_outputs = cur_outputs[0]
-        #         cur_outputs = cur_outputs.detach()
 
         # ResBlock's split or ResnetBlock's split has been set in save_inout or even before, and cur_inputs does not contain split
         out_quant = block(*cur_inputs)
