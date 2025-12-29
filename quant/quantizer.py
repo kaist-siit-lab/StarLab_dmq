@@ -248,6 +248,22 @@ class ActivationQuantizer(nn.Module):
         
         return delta, zero_point
 
+    def get_ptf_scale_zero_point(sefl, x, num_scales=4):
+        D = x.ndim
+        N = x.size(0)
+        channel_dim = 1
+        C = x.size(channel_dim)
+
+        if self.delta is None:
+            scale, zero_point = self.get_scale_zero_point(x, channel_wise=False, running_stat=False)
+        else:
+            scale, zero_point = self.delta, self.zero_point
+        scale = scale.to(x.device)
+        zero_point = zero_point.to(x.device)
+        
+        scales = [scale / (2 ** i) for i in range(num_scales)] # [scale8, scale4, scale2, scale1]
+        scales.reverse()
+  
     def extra_repr(self) -> str:
         s = 'bits={bits}, symmetric={symmetric}, channel_wise={channel_wise}, dynamic={dynamic}'
         return s.format(**self.__dict__)
