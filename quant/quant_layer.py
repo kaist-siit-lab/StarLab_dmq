@@ -8,11 +8,6 @@ from typing import List, Union
 from quant.quantizer import AdaRoundQuantizer, ActivationQuantizer
 
 QMODE = Enum('QMODE', ('QDIFF', 'NORMAL', 'PTQD'))
-QMAP = {
-        nn.Linear: F.linear,
-        nn.Conv1d: F.conv1d,
-        nn.Conv2d: F.conv2d,
-    }
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +19,13 @@ class StraightThrough(nn.Module):
         return x
 
 class QuantLayer(nn.Module):
+
+    QMAP = {
+        nn.Linear: F.linear,
+        nn.Conv1d: F.conv1d,
+        nn.Conv2d: F.conv2d,
+    }
+        
     def __init__(self,
                  layer: Union[nn.Conv2d, nn.Linear, nn.Conv1d],
                  wq_params: dict = {},
