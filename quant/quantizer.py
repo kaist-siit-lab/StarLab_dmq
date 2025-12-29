@@ -263,6 +263,23 @@ class ActivationQuantizer(nn.Module):
         
         scales = [scale / (2 ** i) for i in range(num_scales)] # [scale8, scale4, scale2, scale1]
         scales.reverse()
+
+        # Vectorized calculation for all channels at once
+        scales = torch.stack(scales, dim=-1)
+        zero_point = zero_point.unsqueeze(-1)  # Shape: [1, C, 1, 1, 1]
+
+        best_per_sample = torch.empty((C, N), dtype=torch.long, device=x.device)
+        for j in range(C):
+            data = x.select(channel_dim, j).unsqueeze(channel_dim).unsqueeze(-1) # [N, 1, H, W, 1]
+            data_q = ((data / scales + zero_point).round().clamp(self.min_int, self.max_int) - zero_point) * scales
+            
+            reduce_dims = [
+                d for d in range(data_q.ndim)
+                if d not in (0, data_q.ndim - 1)
+            ]
+
+            scores = (data - data_q).abs().pow(2).mean(dim=reduce_dims) # Shape: [N, num_scales]
+            best_per_sample[j] = torch.argmin(scores, dim=1).to(int)
   
     def extra_repr(self) -> str:
         s = 'bits={bits}, symmetric={symmetric}, channel_wise={channel_wise}, dynamic={dynamic}'
