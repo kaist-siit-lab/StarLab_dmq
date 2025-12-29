@@ -383,3 +383,16 @@ class QuantSpatialTransformer(BaseQuantBlock):
         self.proj_in = attn.proj_in
         self.transformer_blocks = attn.transformer_blocks
         self.proj_out = attn.proj_out
+
+    def forward(self, x, context=None, t=None, prev_emb_out=None):
+        # note: if no context is given, cross-attention defaults to self-attention
+        b, c, h, w = x.shape
+        x_in = x
+        x = self.norm(x)
+        x = self.proj_in(x, t, prev_emb_out)
+        x = rearrange(x, 'b c h w -> b (h w) c')
+        for block in self.transformer_blocks:
+            x = block(x, context=context, t=t, prev_emb_out=prev_emb_out)
+        x = rearrange(x, 'b (h w) c -> b c h w', h=h, w=w)
+        x = self.proj_out(x, t, prev_emb_out)
+        return x + x_in
