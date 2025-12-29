@@ -282,3 +282,59 @@ class QuantFeedForward(BaseQuantBlock):
         x = self.net[1](x)
         x = self.net[2](x, t, prev_emb_out)
         return x
+
+class QuantCrossAttention(BaseQuantBlock):
+    def __init__(self, attn, aq_params, softmax_a_bit=8, **kwargs):
+        super().__init__(aq_params)
+
+        self.scale = attn.scale
+        self.heads = attn.heads
+
+        self.to_q = attn.to_q
+        self.to_k = attn.to_k
+        self.to_v = attn.to_v
+
+        self.to_out = attn.to_out
+
+        self.aqtizer_q = ActivationQuantizer(**aq_params)
+        self.aqtizer_k = ActivationQuantizer(**aq_params)
+        self.aqtizer_v = ActivationQuantizer(**aq_params)
+
+        aq_params_w = aq_params.copy()
+        aq_params_w['bits'] = softmax_a_bit
+        aq_params_w['symmetric'] = False
+        aq_params_w['always_zero'] = True
+        self.aqtizer_w = ActivationQuantizer(**aq_params)
+
+    def forward(self, x, context=None, mask=None, t=None, prev_emb_out=None):
+        h = self.heads
+
+        q = self.to_q(x, t, prev_emb_out)
+        context = default(context, x)
+        k = self.to_k(context, t, prev_emb_out)
+        v = self.to_v(context, t, prev_emb_out)
+
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
+
+        if self.use_aq and not self.disable_aq:
+            quant_q = self.aqtizer_q(q)
+            quant_k = self.aqtizer_k(k)
+            sim = torch.einsum('b i d, b j d -> b i j', quant_q, quant_k) * self.scale
+        else:
+            sim = torch.einsum('b i d, b j d -> b i j', q, k) * self.scale
+
+        if exists(mask):
+            mask = rearrange(mask, 'b ... -> b (...)')
+            max_neg_value = -torch.finfo(sim.dtype).max
+            mask = repeat(mask, 'b j -> (b h) () j', h=h)
+            sim.masked_fill_(~mask, max_neg_value)
+        attn = sim.softmax(dim=-1)
+
+        if self.use_aq and not self.disable_aq:
+            out = torch.einsum('b i j, b j d -> b i d', self.aqtizer_w(attn), self.aqtizer_v(v))
+        else:
+            out = torch.einsum('b i j, b j d -> b i d', attn, v)
+        out = rearrange(out, '(b h) n d -> b n (h d)', h=h)
+        out = self.to_out[0](out, t, prev_emb_out)
+        out = self.to_out[-1](out)
+        return out
