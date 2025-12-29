@@ -88,3 +88,47 @@ def generate_cali_data_ldm(model: LatentDiffusion,
     for i in range(len(tmp[0])):
         cali_data += (torch.cat([x[i] for x in tmp]), )
     return cali_data
+
+
+def generate_cali_data_ldm_imagenet(model: LatentDiffusion,
+                                    T: int,
+                                    c: int,
+                                    num_classes: int,
+                                    num_samples: int,
+                                    batch_size: int, # 8
+                                    shape: List[int],
+                                    eta: float = 0.0,
+                                    scale: float = 3.0,
+                                    **kwargs
+                                    ) -> Tuple[torch.Tensor]:
+    sampler = DDIMSampler(model)
+    tmp = list()
+    class_labels = random.choices(range(1000), k=num_samples)
+    with  torch.no_grad():
+        with model.ema_scope():
+            for i in range(1, T + 1):
+                if i % c == 0:
+                    uc_t = model.get_learned_conditioning(
+                        {model.cond_stage_key: torch.tensor(batch_size * [1000]).to(model.device)}
+                    )
+                    for j in range(0, len(class_labels), batch_size):
+                        xc = torch.tensor(class_labels[j:j+batch_size])
+                        c_t = model.get_learned_conditioning({model.cond_stage_key: xc.to(model.device)})
+                        x_t, t_t = sampler.sample(S=T,
+                                                  batch_size=batch_size,
+                                                  shape=shape,
+                                                  verbose=False,
+                                                  eta=eta,
+                                                  unconditional_guidance_scale=scale,
+                                                  unconditional_conditioning=uc_t,
+                                                  conditioning=c_t,
+                                                  untill_fake_t=i)
+                        if isinstance(sampler, DDIMSampler):
+                            ddpm_time_num = 1000
+                            real_time = (T - i) * ddpm_time_num // T + 1
+                            t_t = torch.full((batch_size,), real_time, device=sampler.model.betas.device, dtype=torch.long)
+                        tmp += [[x_t, t_t, c_t], [x_t, t_t, uc_t]]
+    cali_data = ()
+    for i in range(len(tmp[0])):
+        cali_data += (torch.cat([x[i] for x in tmp]), )
+    return cali_data
