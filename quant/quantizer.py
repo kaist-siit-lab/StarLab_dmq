@@ -280,6 +280,24 @@ class ActivationQuantizer(nn.Module):
 
             scores = (data - data_q).abs().pow(2).mean(dim=reduce_dims) # Shape: [N, num_scales]
             best_per_sample[j] = torch.argmin(scores, dim=1).to(int)
+
+        best_per_sample = best_per_sample.transpose(0, 1)  # [N, C]
+        best_index = torch.mode(best_per_sample, dim=0)[0].float()  # [C]
+        self.index_ratio = (best_per_sample == best_index).sum(0) / N
+
+        best_index[self.index_ratio < self.ratio_threshold] = num_scales - 1
+        scale_mask = 2 ** (best_index - num_scales + 1) # [C]
+        # scale_mask = 2 ** best_index  # [C]
+
+        x_shape = [1] * D
+        x_shape[channel_dim] = -1
+        
+        delta = (scale * scale_mask.reshape(*x_shape))
+        zero_point = zero_point.squeeze(-1)
+
+        self.scale_mask = scale_mask
+
+        return delta, zero_point
   
     def extra_repr(self) -> str:
         s = 'bits={bits}, symmetric={symmetric}, channel_wise={channel_wise}, dynamic={dynamic}'
