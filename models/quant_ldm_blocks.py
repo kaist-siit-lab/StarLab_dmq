@@ -13,17 +13,6 @@ from quant.quant_layer import QuantLayer
 from quant.quantizer import ActivationQuantizer
 
 
-# class EmbedLayer(nn.Module):
-#     def __init__(
-#             self,
-            
-#         ):        
-#         super().__init__()
-
-#     def forward(self):
-#         return
-
-
 class QuantTimestepEmbedSequential(TimestepEmbedSequential):
     """
     A sequential module that passes timestep embeddings to the children that
