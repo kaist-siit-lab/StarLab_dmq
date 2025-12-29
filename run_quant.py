@@ -3,12 +3,12 @@ import pandas as pd
 import numpy as np
 import logging
 import torch
+import pdb
+
 from torch import autocast
 from omegaconf import OmegaConf
 from pytorch_lightning import seed_everything
-
 from ldm.util import instantiate_from_config
-
 from sample_ldm import generate_samples_ldm, generate_samples_ldm_imagenet, generate_samples_txt2img
 from quant.calibration import cali_model, load_cali_model
 from quant.data_generate import generate_cali_data_ldm, generate_cali_data_ldm_imagenet, generate_cali_text_guided_data
@@ -16,7 +16,6 @@ from quant.quant_layer import QMODE
 from quant.quant_model import QuantModel
 from quant.reconstruction_util import RLOSS
 from quant.quant_utils import Scaler
-import pdb
 
 
 def get_prompts(path: str,
@@ -100,9 +99,6 @@ def build_model(opt, ckpt):
                 use_split=opt.use_split
             )
         qnn.to('cuda').eval().to(memory_format=torch.channels_last)
-        
-        # logger.info("Compiling Quantization model. First forward pass would be slow.")
-        # qnn = torch.compile(qnn)
 
         if opt.load_quant:
             logger.info("Loading quantized model...")
@@ -221,9 +217,6 @@ def build_model(opt, ckpt):
             logger.info(f"Maximum memory reserved: {torch.cuda.max_memory_reserved()  / 2**20} MB")
                 
         model.model.diffusion_model = qnn
-        # tot = len(list(cali_ckpt.keys())) - 1
-        # model.model.tot = 1000 // tot
-        # model.model.t_max = tot - 1
         model.model.ckpt = cali_ckpt
         model.model.iter = 0
             
