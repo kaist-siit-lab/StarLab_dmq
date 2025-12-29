@@ -1,15 +1,14 @@
-# import tensorflow.compat.v1 as tf
 import argparse, os, sys, glob, datetime, yaml, math, json
 from typing import Tuple
 import torch
 import time
 import random
 import numpy as np
+import pandas as pd
 import logging
 from tqdm import trange, tqdm
 
 from omegaconf import OmegaConf
-import pandas as pd
 from PIL import Image
 from pytorch_lightning import seed_everything
 from einops import rearrange
@@ -229,8 +228,7 @@ def generate_samples_ldm_imagenet(model, logdir, batch_size, custom_steps, eta=0
                         imgpath = os.path.join(logdir, 'images', f"sample_{base_count:06}.png")
                         img.save(imgpath)
                         base_count += 1
-                    # saved = True
-                # all_samples.append(x_samples_ddim)
+
                 sample = 255. * rearrange(x_samples_ddim, 'b c h w -> b h w c').cpu().numpy()
                 sample = sample.astype(np.uint8)
                 all_imags.extend([sample])
