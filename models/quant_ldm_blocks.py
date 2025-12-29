@@ -338,3 +338,32 @@ class QuantCrossAttention(BaseQuantBlock):
         out = self.to_out[0](out, t, prev_emb_out)
         out = self.to_out[-1](out)
         return out
+
+class QuantBasicTransformerBlock(BaseQuantBlock):
+    def __init__(self, tran, aq_params, softmax_a_bit=8, **kwargs):
+        super().__init__(aq_params)
+        self.attn1 = tran.attn1
+        self.ff = tran.ff
+        self.attn2 = tran.attn2
+
+        self.norm1 = tran.norm1
+        self.norm2 = tran.norm2
+        self.norm3 = tran.norm3
+        self.checkpoint =  False
+
+        self.attn1.use_aq = False
+        self.attn2.use_aq = False
+        self.attn1.disable_aq = False
+        self.attn2.disable_aq = False
+
+    def forward(self, x, context=None, t=None, prev_emb_out=None):
+        return checkpoint(self._forward, (x, context, t, prev_emb_out), self.parameters(), self.checkpoint)
+
+    def _forward(self, x, context=None, t=None, prev_emb_out=None):
+        assert context is not None
+
+        x = self.attn1(self.norm1(x), t=t, prev_emb_out=prev_emb_out) + x
+        x = self.attn2(self.norm2(x), context, t=t, prev_emb_out=prev_emb_out) + x
+        x = self.ff(self.norm3(x), t=t, prev_emb_out=prev_emb_out) + x
+        return x
+    
